@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Epidemic Simulation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #08080c;
+    --panel: #0e0e14;
+    --panel-border: #1a1a28;
+    --text: #c8c8d4;
+    --text-dim: #6a6a80;
+    --accent: #ff3a5c;
+    --susceptible: #3a8bff;
+    --infected: #ff3a3a;
+    --recovered: #2ae68c;
+    --dead: #555568;
+    --vaccination: #2ae68c;
+    --lockdown: #ff8c2a;
+    --slider-track: #1a1a28;
+    --slider-thumb: #ff3a5c;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+  }
+
+  #canvas-container {
+    flex: 1;
+    position: relative;
+    cursor: crosshair;
+  }
+
+  #simCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  #canvas-overlay {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    pointer-events: none;
+    user-select: none;
+  }
+
+  #canvas-overlay .day {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  #mode-indicator {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(14, 14, 20, 0.85);
+    border: 1px solid var(--panel-border);
+    pointer-events: none;
+    color: var(--text-dim);
+  }
+
+  #panel {
+    width: 340px;
+    min-width: 340px;
+    height: 100vh;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    scrollbar-width: thin;
+    scrollbar-color: var(--panel-border) transparent;
+  }
+
+  #panel::-webkit-scrollbar { width: 4px; }
+  #panel::-webkit-scrollbar-track { background: transparent; }
+  #panel::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+
+  .panel-header {
+    padding: 20px 20px 12px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .panel-header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #fff;
+  }
+
+  .panel-header .subtitle {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .stats-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .stat-badge {
+    text-align: center;
+    padding: 8px 4px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--panel-border);
+  }
+
+  .stat-badge .count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .stat-badge .label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .stat-badge.s .count { color: var(--susceptible); }
+  .stat-badge.i .count { color: var(--infected); }
+  .stat-badge.r .count { color: var(--recovered); }
+  .stat-badge.d .count { color: var(--dead); }
+
+  .r-eff {
+    padding: 8px 20px;
+    border-bottom: 1px solid var(--panel-border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .r-eff span:last-child {
+    font-weight: 700;
+    font-size: 16px;
+  }
+
+  #chartCanvas {
+    display: block;
+    width: 100%;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .section {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .slider-group {
+    margin-bottom: 10px;
+  }
+
+  .slider-group:last-child { margin-bottom: 0; }
+
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .slider-label .val {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--slider-track);
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--slider-thumb);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--slider-thumb);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex: 1;
+    text-align: center;
+    min-width: 80px;
+  }
+
+  .btn:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .btn.accent {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .btn.accent:hover {
+    background: #ff1a40;
+  }
+
+  .btn.lockdown-active {
+    background: var(--lockdown);
+    border-color: var(--lockdown);
+    color: #000;
+  }
+
+  .mode-btns {
+    display: flex;
+    gap: 4px;
+  }
+
+  .mode-btns .btn {
+    font-size: 10px;
+    padding: 6px 8px;
+    min-width: 0;
+  }
+
+  .variant-list {
+    margin-top: 8px;
+  }
+
+  .variant-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .variant-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .variant-item span { color: var(--text-dim); }
+
+  /* Tooltips */
+  .tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--panel-border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    cursor: help;
+    margin-left: 6px;
+    flex-shrink: 0;
+    vertical-align: middle;
+  }
+
+  .tip:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+
+  .tip .tip-text {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 210px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #1a1a28;
+    border: 1px solid #2a2a3c;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    line-height: 1.45;
+    font-weight: 400;
+    text-align: left;
+    pointer-events: none;
+    transition: opacity 0.15s, visibility 0.15s;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+
+  .tip .tip-text::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #2a2a3c;
+  }
+
+  .tip:hover .tip-text { visibility: visible; opacity: 1; }
+
+  /* Right-aligned tooltips to avoid panel overflow */
+  .tip .tip-right {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+  .tip .tip-right::after {
+    left: auto;
+    right: 12px;
+    transform: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-container">
+  <canvas id="simCanvas"></canvas>
+  <div id="canvas-overlay">
+    <div class="day" id="dayLabel">DAY 0</div>
+    <div id="fpsLabel">0 fps</div>
+  </div>
+  <div id="mode-indicator">MODE: INFECT AGENT</div>
+</div>
+
+<div id="panel">
+  <div class="panel-header">
+    <h1>EPIDEMIC SIM</h1>
+    <div class="subtitle">SIR Model with Variants</div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-badge s" title="Agents that can still be infected"><div class="count" id="sCount">0</div><div class="label">Suscept.</div></div>
+    <div class="stat-badge i" title="Currently infected and contagious agents"><div class="count" id="iCount">0</div><div class="label">Infected</div></div>
+    <div class="stat-badge r" title="Recovered agents — now immune to infection"><div class="count" id="rCount">0</div><div class="label">Recov.</div></div>
+    <div class="stat-badge d" title="Agents that died from the disease"><div class="count" id="dCount">0</div><div class="label">Dead</div></div>
+  </div>
+
+  <div class="r-eff">
+    <span>R<sub>eff</sub> <span class="tip">?<span class="tip-text">Effective reproduction number — average secondary infections per case. Above 1.0 means the epidemic is growing, below 1.0 means it's declining.</span></span></span>
+    <span id="rEff">0.00</span>
+  </div>
+
+  <canvas id="chartCanvas" width="340" height="120"></canvas>
+
+  <div class="section">
+    <div class="section-title">Controls</div>
+    <div class="btn-row" style="margin-bottom:8px">
+      <button class="btn accent" id="btnStart" title="Start or pause the simulation">Start</button>
+      <button class="btn" id="btnReset" title="Reset everything — clears all agents, zones, and stats">Reset</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="btnPatientZero" title="Infect one random susceptible agent with the original variant">Patient Zero</button>
+      <button class="btn" id="btnLockdown" title="Toggle global lockdown — drastically reduces all agent movement">Lockdown</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Canvas Mode</div>
+    <div class="mode-btns">
+      <button class="btn active" data-mode="infect" title="Click an agent on the canvas to infect it">Infect</button>
+      <button class="btn" data-mode="vaccinate" title="Click the canvas to place a vaccination zone that immunizes passing agents">Vacc. Zone</button>
+      <button class="btn" data-mode="lockdown" title="Click the canvas to place a lockdown zone that slows agents inside it">Lock Zone</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Population</div>
+    <div class="slider-group">
+      <div class="slider-label"><span>Agents <span class="tip">?<span class="tip-text">Total number of agents in the simulation. Change takes effect on Reset.</span></span></span><span class="val" id="valAgents">500</span></div>
+      <input type="range" id="slAgents" min="50" max="2000" value="500" step="10">
+    </div>
+    <div class="slider-group">
+      <div class="slider-label"><span>Agent Speed <span class="tip">?<span class="tip-text">Base movement speed of all agents. Higher values mean faster spread but also faster escape from danger zones.</span></span></span><span class="val" id="valSpeed">1.5</span></div>
+      <input type="range" id="slSpeed" min="0.2" max="4" value="1.5" step="0.1">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Disease</div>
+    <div class="slider-group">
+      <div class="slider-label"><span>R₀ <span class="tip">?<span class="tip-text">Basic reproduction number — how many agents one infected agent will infect on average. Higher = more contagious. COVID ≈ 2–3, Measles ≈ 12–18.</span></span></span><span class="val" id="valR0">2.5</span></div>
+      <input type="range" id="slR0" min="0.5" max="8" value="2.5" step="0.1">
+    </div>
+    <div class="slider-group">
+      <div class="slider-label"><span>Mortality % <span class="tip">?<span class="tip-text">Chance an infected agent dies instead of recovering when their infection timer runs out.</span></span></span><span class="val" id="valMortality">3</span></div>
+      <input type="range" id="slMortality" min="0" max="50" value="3" step="1">
+    </div>
+    <div class="slider-group">
+      <div class="slider-label"><span>Infection Duration <span class="tip">?<span class="tip-text">How many ticks an agent stays infected before recovering or dying. Longer duration = more time to spread the disease.</span></span></span><span class="val" id="valDuration">300</span></div>
+      <input type="range" id="slDuration" min="60" max="800" value="300" step="10">
+    </div>
+    <div class="slider-group">
+      <div class="slider-label"><span>Infection Radius <span class="tip">?<span class="tip-text">Distance (in pixels) at which an infected agent can transmit the disease to nearby susceptible agents.</span></span></span><span class="val" id="valRadius">30</span></div>
+      <input type="range" id="slRadius" min="10" max="80" value="30" step="1">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Vaccination</div>
+    <div class="slider-group">
+      <div class="slider-label"><span>Zone Radius <span class="tip">?<span class="tip-text">Size of vaccination zones placed on the canvas. Susceptible agents passing through are gradually vaccinated.</span></span></span><span class="val" id="valVaccRadius">60</span></div>
+      <input type="range" id="slVaccRadius" min="20" max="150" value="60" step="5">
+    </div>
+    <div class="slider-group">
+      <div class="slider-label"><span>Effectiveness % <span class="tip">?<span class="tip-text">How effective the vaccine is. Higher values mean agents get immunized faster when inside a vaccination zone.</span></span></span><span class="val" id="valVaccEff">90</span></div>
+      <input type="range" id="slVaccEff" min="10" max="100" value="90" step="5">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Lockdown</div>
+    <div class="slider-group">
+      <div class="slider-label"><span>Zone Radius <span class="tip">?<span class="tip-text">Size of lockdown zones placed on the canvas. Agents inside move much slower, reducing contact.</span></span></span><span class="val" id="valLockRadius">80</span></div>
+      <input type="range" id="slLockRadius" min="30" max="200" value="80" step="5">
+    </div>
+    <div class="slider-group">
+      <div class="slider-label"><span>Speed Reduction % <span class="tip">?<span class="tip-text">How much agent speed is reduced inside lockdown zones (or globally during lockdown). 90% means agents move at 10% of normal speed.</span></span></span><span class="val" id="valLockReduction">90</span></div>
+      <input type="range" id="slLockReduction" min="50" max="99" value="90" step="1">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Variants</div>
+    <div class="btn-row" style="margin-bottom:8px">
+      <button class="btn" id="btnVariant" title="Create a new virus variant with random properties and infect one agent with it">Introduce Variant</button>
+    </div>
+    <div class="variant-list" id="variantList"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── Canvas setup ──
+  const simCanvas = document.getElementById('simCanvas');
+  const ctx = simCanvas.getContext('2d');
+  const chartCanvas = document.getElementById('chartCanvas');
+  const cctx = chartCanvas.getContext('2d');
+
+  function resizeCanvas() {
+    const container = document.getElementById('canvas-container');
+    const dpr = window.devicePixelRatio || 1;
+    simCanvas.width = container.clientWidth * dpr;
+    simCanvas.height = container.clientHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const panelW = 340;
+    chartCanvas.width = panelW * dpr;
+    chartCanvas.height = 120 * dpr;
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  // ── State ──
+  const S = 0, I = 1, R = 2, D = 3;
+  const STATE_COLORS = ['#3a8bff', '#ff3a3a', '#2ae68c', '#555568'];
+
+  let agents = [];
+  let vaccZones = [];
+  let lockZones = [];
+  let running = false;
+  let globalLockdown = false;
+  let tickCount = 0;
+  let canvasMode = 'infect'; // 'infect' | 'vaccinate' | 'lockdown'
+  let history = []; // [{s,i,r,d}, ...]
+  let recentInfections = []; // [{tick, secondaryCount}]
+
+  // ── Variants ──
+  const VARIANT_NAMES = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Omicron', 'Lambda', 'Sigma', 'Zeta'];
+  const VARIANT_COLORS = ['#ff3a3a', '#ff8c2a', '#e83aff', '#ffe13a', '#3affec', '#ff3a8c', '#8cff3a', '#3a5cff'];
+  let variants = [];
+  let nextVariantIdx = 0;
+
+  function createDefaultVariant() {
+    return {
+      name: 'Original',
+      color: '#ff3a3a',
+      r0Mult: 1.0,
+      mortalityMult: 1.0,
+      durationMult: 1.0,
+    };
+  }
+
+  function createNewVariant() {
+    const idx = nextVariantIdx++;
+    const name = VARIANT_NAMES[idx % VARIANT_NAMES.length] + (idx >= VARIANT_NAMES.length ? ` ${Math.floor(idx / VARIANT_NAMES.length) + 1}` : '');
+    return {
+      name,
+      color: VARIANT_COLORS[idx % VARIANT_COLORS.length],
+      r0Mult: 0.8 + Math.random() * 1.4,
+      mortalityMult: 0.5 + Math.random() * 1.5,
+      durationMult: 0.7 + Math.random() * 0.8,
+    };
+  }
+
+  // ── Sliders ──
+  function getVal(id) { return parseFloat(document.getElementById(id).value); }
+
+  const sliders = [
+    ['slAgents', 'valAgents', 0],
+    ['slSpeed', 'valSpeed', 1],
+    ['slR0', 'valR0', 1],
+    ['slMortality', 'valMortality', 0],
+    ['slDuration', 'valDuration', 0],
+    ['slRadius', 'valRadius', 0],
+    ['slVaccRadius', 'valVaccRadius', 0],
+    ['slVaccEff', 'valVaccEff', 0],
+    ['slLockRadius', 'valLockRadius', 0],
+    ['slLockReduction', 'valLockReduction', 0],
+  ];
+
+  sliders.forEach(([slId, valId, decimals]) => {
+    const sl = document.getElementById(slId);
+    const val = document.getElementById(valId);
+    sl.addEventListener('input', () => {
+      val.textContent = decimals ? parseFloat(sl.value).toFixed(decimals) : sl.value;
+    });
+  });
+
+  // ── Agent creation ──
+  function canvasW() { return document.getElementById('canvas-container').clientWidth; }
+  function canvasH() { return document.getElementById('canvas-container').clientHeight; }
+
+  function createAgent(x, y) {
+    const speed = getVal('slSpeed');
+    const angle = Math.random() * Math.PI * 2;
+    return {
+      x: x ?? Math.random() * canvasW(),
+      y: y ?? Math.random() * canvasH(),
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      state: S,
+      variant: null,
+      infectedTick: 0,
+      infectionDuration: 0,
+      secondaryInfections: 0,
+    };
+  }
+
+  function initAgents() {
+    const count = getVal('slAgents');
+    agents = [];
+    for (let i = 0; i < count; i++) {
+      agents.push(createAgent());
+    }
+  }
+
+  function resetSim() {
+    running = false;
+    document.getElementById('btnStart').textContent = 'Start';
+    tickCount = 0;
+    history = [];
+    recentInfections = [];
+    globalLockdown = false;
+    document.getElementById('btnLockdown').classList.remove('lockdown-active');
+    document.getElementById('btnLockdown').textContent = 'Lockdown';
+    vaccZones = [];
+    lockZones = [];
+    variants = [createDefaultVariant()];
+    nextVariantIdx = 0;
+    renderVariantList();
+    initAgents();
+  }
+
+  // ── Infection logic ──
+  function infectAgent(agent, variant) {
+    if (agent.state !== S) return;
+    agent.state = I;
+    agent.variant = variant || variants[0];
+    agent.infectedTick = tickCount;
+    const baseDuration = getVal('slDuration');
+    agent.infectionDuration = baseDuration * (agent.variant.durationMult || 1);
+    agent.secondaryInfections = 0;
+  }
+
+  function transmissionProb() {
+    const r0 = getVal('slR0');
+    const duration = getVal('slDuration');
+    // P per tick so that expected contacts ~ R0 over duration
+    // Simplified: p = R0 / (duration * averageContactsPerTick)
+    // We'll calibrate so it feels right
+    return r0 / (duration * 2.5);
+  }
+
+  // ── Spatial grid for collision detection ──
+  function buildGrid(cellSize) {
+    const grid = {};
+    const w = canvasW();
+    for (let i = 0; i < agents.length; i++) {
+      const a = agents[i];
+      const cx = Math.floor(a.x / cellSize);
+      const cy = Math.floor(a.y / cellSize);
+      const key = cx + ',' + cy;
+      if (!grid[key]) grid[key] = [];
+      grid[key].push(i);
+    }
+    return grid;
+  }
+
+  function getNeighborIndices(grid, x, y, cellSize) {
+    const cx = Math.floor(x / cellSize);
+    const cy = Math.floor(y / cellSize);
+    const result = [];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const key = (cx + dx) + ',' + (cy + dy);
+        if (grid[key]) {
+          for (let j = 0; j < grid[key].length; j++) {
+            result.push(grid[key][j]);
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  // ── Simulation tick ──
+  function tick() {
+    const w = canvasW();
+    const h = canvasH();
+    const speed = getVal('slSpeed');
+    const infRadius = getVal('slRadius');
+    const mortality = getVal('slMortality') / 100;
+    const vaccEff = getVal('slVaccEff') / 100;
+    const lockReduction = getVal('slLockReduction') / 100;
+
+    // 1. Move agents
+    for (let i = 0; i < agents.length; i++) {
+      const a = agents[i];
+      if (a.state === D) continue;
+
+      let speedMult = 1;
+      if (globalLockdown) speedMult = 1 - lockReduction;
+
+      // Check lockdown zones
+      if (!globalLockdown) {
+        for (let z = 0; z < lockZones.length; z++) {
+          const lz = lockZones[z];
+          const dx = a.x - lz.x;
+          const dy = a.y - lz.y;
+          if (dx * dx + dy * dy < lz.r * lz.r) {
+            speedMult = Math.min(speedMult, 1 - lockReduction);
+            break;
+          }
+        }
+      }
+
+      // Random walk jitter
+      a.vx += (Math.random() - 0.5) * 0.3;
+      a.vy += (Math.random() - 0.5) * 0.3;
+
+      // Normalize to speed
+      const mag = Math.sqrt(a.vx * a.vx + a.vy * a.vy);
+      if (mag > 0) {
+        a.vx = (a.vx / mag) * speed * speedMult;
+        a.vy = (a.vy / mag) * speed * speedMult;
+      }
+
+      a.x += a.vx;
+      a.y += a.vy;
+
+      // Bounce
+      if (a.x < 0) { a.x = 0; a.vx *= -1; }
+      if (a.x > w) { a.x = w; a.vx *= -1; }
+      if (a.y < 0) { a.y = 0; a.vy *= -1; }
+      if (a.y > h) { a.y = h; a.vy *= -1; }
+    }
+
+    // 2. Vaccination zones
+    for (let z = 0; z < vaccZones.length; z++) {
+      const vz = vaccZones[z];
+      for (let i = 0; i < agents.length; i++) {
+        const a = agents[i];
+        if (a.state !== S) continue;
+        const dx = a.x - vz.x;
+        const dy = a.y - vz.y;
+        if (dx * dx + dy * dy < vz.r * vz.r) {
+          // Per-tick vaccination chance
+          if (Math.random() < vaccEff * 0.02) {
+            a.state = R;
+          }
+        }
+      }
+    }
+
+    // 3. Infection spread (grid-accelerated)
+    const cellSize = infRadius * 1.5;
+    const grid = buildGrid(cellSize);
+    const prob = transmissionProb();
+
+    for (let i = 0; i < agents.length; i++) {
+      const a = agents[i];
+      if (a.state !== I) continue;
+
+      const r0Mult = a.variant ? a.variant.r0Mult : 1;
+      const neighbors = getNeighborIndices(grid, a.x, a.y, cellSize);
+
+      for (let n = 0; n < neighbors.length; n++) {
+        const j = neighbors[n];
+        const b = agents[j];
+        if (b.state !== S) continue;
+
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const distSq = dx * dx + dy * dy;
+
+        if (distSq < infRadius * infRadius) {
+          if (Math.random() < prob * r0Mult) {
+            infectAgent(b, a.variant);
+            a.secondaryInfections++;
+          }
+        }
+      }
+    }
+
+    // 4. Recovery / Death
+    for (let i = 0; i < agents.length; i++) {
+      const a = agents[i];
+      if (a.state !== I) continue;
+
+      if (tickCount - a.infectedTick >= a.infectionDuration) {
+        const varMort = a.variant ? a.variant.mortalityMult : 1;
+        if (Math.random() < mortality * varMort) {
+          a.state = D;
+        } else {
+          a.state = R;
+        }
+        // Track for R_eff
+        recentInfections.push({ tick: tickCount, count: a.secondaryInfections });
+      }
+    }
+
+    // Prune old R_eff data
+    const rEffWindow = 600;
+    recentInfections = recentInfections.filter(r => tickCount - r.tick < rEffWindow);
+
+    tickCount++;
+
+    // 5. Record history
+    if (tickCount % 3 === 0) {
+      let s = 0, inf = 0, r = 0, d = 0;
+      for (let i = 0; i < agents.length; i++) {
+        switch (agents[i].state) {
+          case S: s++; break;
+          case I: inf++; break;
+          case R: r++; break;
+          case D: d++; break;
+        }
+      }
+      history.push({ s, i: inf, r, d });
+      if (history.length > 600) history.shift();
+    }
+  }
+
+  // ── Rendering ──
+  function render() {
+    const w = canvasW();
+    const h = canvasH();
+    const infRadius = getVal('slRadius');
+
+    // Clear
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.015)';
+    ctx.lineWidth = 1;
+    const gridSize = 40;
+    for (let x = 0; x < w; x += gridSize) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+    for (let y = 0; y < h; y += gridSize) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // Lockdown zones
+    for (let z = 0; z < lockZones.length; z++) {
+      const lz = lockZones[z];
+      ctx.beginPath();
+      ctx.arc(lz.x, lz.y, lz.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,140,42,0.04)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,140,42,0.3)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Vaccination zones
+    for (let z = 0; z < vaccZones.length; z++) {
+      const vz = vaccZones[z];
+      ctx.beginPath();
+      ctx.arc(vz.x, vz.y, vz.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(42,230,140,0.05)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(42,230,140,0.25)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Cross icon
+      ctx.strokeStyle = 'rgba(42,230,140,0.15)';
+      ctx.lineWidth = 3;
+      const cs = 8;
+      ctx.beginPath(); ctx.moveTo(vz.x - cs, vz.y); ctx.lineTo(vz.x + cs, vz.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(vz.x, vz.y - cs); ctx.lineTo(vz.x, vz.y + cs); ctx.stroke();
+    }
+
+    // Global lockdown overlay
+    if (globalLockdown) {
+      ctx.fillStyle = 'rgba(255,140,42,0.03)';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = 'rgba(255,140,42,0.2)';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(4, 4, w - 8, h - 8);
+    }
+
+    // Agents
+    const agentRadius = 3;
+    const pulse = Math.sin(tickCount * 0.05) * 0.3 + 0.7;
+
+    for (let i = 0; i < agents.length; i++) {
+      const a = agents[i];
+
+      // Infection radius glow for infected
+      if (a.state === I) {
+        const col = a.variant ? a.variant.color : '#ff3a3a';
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, infRadius, 0, Math.PI * 2);
+        ctx.fillStyle = hexToRgba(col, 0.04 * pulse);
+        ctx.fill();
+        ctx.strokeStyle = hexToRgba(col, 0.1 * pulse);
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+
+      // Agent body
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, agentRadius, 0, Math.PI * 2);
+
+      if (a.state === D) {
+        ctx.fillStyle = STATE_COLORS[D];
+        ctx.fill();
+        // X mark for dead
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(a.x - 2, a.y - 2); ctx.lineTo(a.x + 2, a.y + 2);
+        ctx.moveTo(a.x + 2, a.y - 2); ctx.lineTo(a.x - 2, a.y + 2);
+        ctx.stroke();
+      } else if (a.state === I) {
+        const col = a.variant ? a.variant.color : STATE_COLORS[I];
+        ctx.fillStyle = col;
+        ctx.fill();
+        // Glow
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.fillStyle = STATE_COLORS[a.state];
+        ctx.fill();
+      }
+    }
+
+    // Update stats
+    let s = 0, inf = 0, r = 0, d = 0;
+    for (let i = 0; i < agents.length; i++) {
+      switch (agents[i].state) {
+        case S: s++; break;
+        case I: inf++; break;
+        case R: r++; break;
+        case D: d++; break;
+      }
+    }
+    document.getElementById('sCount').textContent = s;
+    document.getElementById('iCount').textContent = inf;
+    document.getElementById('rCount').textContent = r;
+    document.getElementById('dCount').textContent = d;
+    document.getElementById('dayLabel').textContent = `DAY ${Math.floor(tickCount / 60)}`;
+
+    // R_eff
+    let rEff = 0;
+    if (recentInfections.length > 0) {
+      let sum = 0;
+      for (let i = 0; i < recentInfections.length; i++) sum += recentInfections[i].count;
+      rEff = sum / recentInfections.length;
+    }
+    const rEffEl = document.getElementById('rEff');
+    rEffEl.textContent = rEff.toFixed(2);
+    rEffEl.style.color = rEff > 1 ? '#ff3a3a' : rEff > 0.5 ? '#ff8c2a' : '#2ae68c';
+
+    // Draw chart
+    renderChart();
+  }
+
+  function renderChart() {
+    const w = 340;
+    const h = 120;
+    cctx.fillStyle = '#0a0a0f';
+    cctx.fillRect(0, 0, w, h);
+
+    if (history.length < 2) return;
+
+    const total = agents.length || 1;
+    const len = history.length;
+    const xStep = w / (len - 1);
+
+    const lines = [
+      { key: 's', color: '#3a8bff' },
+      { key: 'i', color: '#ff3a3a' },
+      { key: 'r', color: '#2ae68c' },
+      { key: 'd', color: '#555568' },
+    ];
+
+    // Stacked area (draw in reverse order for layering)
+    // Actually, let's do line chart for clarity
+    for (let l = 0; l < lines.length; l++) {
+      const { key, color } = lines[l];
+      cctx.beginPath();
+      cctx.strokeStyle = color;
+      cctx.lineWidth = 1.5;
+      cctx.globalAlpha = 0.9;
+
+      for (let i = 0; i < len; i++) {
+        const x = i * xStep;
+        const y = h - (history[i][key] / total) * (h - 10) - 5;
+        if (i === 0) cctx.moveTo(x, y);
+        else cctx.lineTo(x, y);
+      }
+      cctx.stroke();
+
+      // Subtle fill
+      cctx.lineTo((len - 1) * xStep, h);
+      cctx.lineTo(0, h);
+      cctx.closePath();
+      cctx.fillStyle = color;
+      cctx.globalAlpha = 0.05;
+      cctx.fill();
+      cctx.globalAlpha = 1;
+    }
+  }
+
+  function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  // ── Variant list UI ──
+  function renderVariantList() {
+    const el = document.getElementById('variantList');
+    el.innerHTML = '';
+    variants.forEach(v => {
+      const div = document.createElement('div');
+      div.className = 'variant-item';
+      div.innerHTML = `<div class="variant-dot" style="background:${v.color}"></div>
+        <strong>${v.name}</strong>
+        <span>R₀×${v.r0Mult.toFixed(1)} M×${v.mortalityMult.toFixed(1)}</span>`;
+      el.appendChild(div);
+    });
+  }
+
+  // ── Controls ──
+  document.getElementById('btnStart').addEventListener('click', function() {
+    running = !running;
+    this.textContent = running ? 'Pause' : 'Start';
+  });
+
+  document.getElementById('btnReset').addEventListener('click', resetSim);
+
+  document.getElementById('btnPatientZero').addEventListener('click', () => {
+    // Find a random susceptible agent
+    const susceptible = agents.filter(a => a.state === S);
+    if (susceptible.length > 0) {
+      const a = susceptible[Math.floor(Math.random() * susceptible.length)];
+      infectAgent(a, variants[0]);
+    }
+  });
+
+  document.getElementById('btnLockdown').addEventListener('click', function() {
+    globalLockdown = !globalLockdown;
+    this.classList.toggle('lockdown-active', globalLockdown);
+    this.textContent = globalLockdown ? 'End Lockdown' : 'Lockdown';
+  });
+
+  document.getElementById('btnVariant').addEventListener('click', () => {
+    const v = createNewVariant();
+    variants.push(v);
+    renderVariantList();
+    // Infect a random susceptible with the new variant
+    const susceptible = agents.filter(a => a.state === S);
+    if (susceptible.length > 0) {
+      const a = susceptible[Math.floor(Math.random() * susceptible.length)];
+      infectAgent(a, v);
+    }
+  });
+
+  // Canvas mode buttons
+  document.querySelectorAll('.mode-btns .btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.mode-btns .btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      canvasMode = this.dataset.mode;
+      const labels = { infect: 'INFECT AGENT', vaccinate: 'PLACE VACCINATION ZONE', lockdown: 'PLACE LOCKDOWN ZONE' };
+      document.getElementById('mode-indicator').textContent = `MODE: ${labels[canvasMode]}`;
+    });
+  });
+
+  // Canvas click
+  simCanvas.addEventListener('click', (e) => {
+    const rect = simCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (canvasMode === 'infect') {
+      // Find nearest susceptible agent
+      let closest = null;
+      let closestDist = Infinity;
+      for (let i = 0; i < agents.length; i++) {
+        if (agents[i].state !== S) continue;
+        const dx = agents[i].x - x;
+        const dy = agents[i].y - y;
+        const dist = dx * dx + dy * dy;
+        if (dist < closestDist) {
+          closestDist = dist;
+          closest = agents[i];
+        }
+      }
+      if (closest && closestDist < 900) { // within 30px
+        infectAgent(closest, variants[0]);
+      }
+    } else if (canvasMode === 'vaccinate') {
+      vaccZones.push({ x, y, r: getVal('slVaccRadius') });
+    } else if (canvasMode === 'lockdown') {
+      lockZones.push({ x, y, r: getVal('slLockRadius') });
+    }
+  });
+
+  // ── FPS tracking ──
+  let frameCount = 0;
+  let lastFpsTime = performance.now();
+
+  // ── Main loop ──
+  function loop() {
+    if (running) {
+      tick();
+    }
+    render();
+
+    frameCount++;
+    const now = performance.now();
+    if (now - lastFpsTime > 1000) {
+      document.getElementById('fpsLabel').textContent = `${frameCount} fps`;
+      frameCount = 0;
+      lastFpsTime = now;
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  // ── Init ──
+  variants = [createDefaultVariant()];
+  renderVariantList();
+  initAgents();
+  loop();
+})();
+</script>
+</body>
+</html>

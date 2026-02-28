@@ -1,5 +1,7 @@
 # Epidemic Simulation
 
+**[Live Demo](https://iloire.github.io/epidemic/)**
+
 A real-time 2D epidemic/disease spread simulation using an SIR model variant. Built with vanilla HTML, JS, and Canvas — zero dependencies, single file.
 
 ![Epidemic Simulation](screenshots/v1.png)

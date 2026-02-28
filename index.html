@@ -343,10 +343,7 @@
   .tip .tip-text {
     visibility: hidden;
     opacity: 0;
-    position: absolute;
-    bottom: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
     width: 210px;
     padding: 8px 10px;
     border-radius: 8px;
@@ -360,7 +357,7 @@
     text-align: left;
     pointer-events: none;
     transition: opacity 0.15s, visibility 0.15s;
-    z-index: 100;
+    z-index: 10000;
     box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   }
 
@@ -374,19 +371,14 @@
     border-top-color: #2a2a3c;
   }
 
-  .tip:hover .tip-text { visibility: visible; opacity: 1; }
+  .tip .tip-text.tip-flipped::after {
+    top: auto;
+    bottom: 100%;
+    border-top-color: transparent;
+    border-bottom-color: #2a2a3c;
+  }
 
-  /* Right-aligned tooltips to avoid panel overflow */
-  .tip .tip-right {
-    left: auto;
-    right: 0;
-    transform: none;
-  }
-  .tip .tip-right::after {
-    left: auto;
-    right: 12px;
-    transform: none;
-  }
+  .tip:hover .tip-text { visibility: visible; opacity: 1; }
 </style>
 </head>
 <body>
@@ -508,6 +500,26 @@
 
 <script>
 (() => {
+  // ── Tooltip positioning (fixed, never clipped) ──
+  document.querySelectorAll('.tip').forEach(tip => {
+    const text = tip.querySelector('.tip-text');
+    if (!text) return;
+    tip.addEventListener('mouseenter', () => {
+      const rect = tip.getBoundingClientRect();
+      let top = rect.top - text.offsetHeight - 8;
+      let left = rect.left + rect.width / 2 - text.offsetWidth / 2;
+      let flipped = false;
+      // Flip below if clipped at top
+      if (top < 4) { top = rect.bottom + 8; flipped = true; }
+      if (left < 4) left = 4;
+      if (left + text.offsetWidth > window.innerWidth - 4) left = window.innerWidth - text.offsetWidth - 4;
+      text.style.top = top + 'px';
+      text.style.left = left + 'px';
+      // Flip arrow
+      text.classList.toggle('tip-flipped', flipped);
+    });
+  });
+
   // ── Canvas setup ──
   const simCanvas = document.getElementById('simCanvas');
   const ctx = simCanvas.getContext('2d');

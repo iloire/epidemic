@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Epidemic Simulation</title>
+<meta name="description" content="Interactive epidemic simulation using the SIR model. Visualize disease spread with variants, vaccination zones, and lockdown mechanics in real time.">
+<meta name="theme-color" content="#08080c">
+<title>Epidemic Simulator — SIR Model with Variants, Vaccination & Lockdown</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
 
@@ -14,12 +16,12 @@
     --panel: #0e0e14;
     --panel-border: #1a1a28;
     --text: #c8c8d4;
-    --text-dim: #6a6a80;
+    --text-dim: #8a8aa4;
     --accent: #ff3a5c;
     --susceptible: #3a8bff;
     --infected: #ff3a3a;
     --recovered: #2ae68c;
-    --dead: #555568;
+    --dead: #7a7a90;
     --vaccination: #2ae68c;
     --lockdown: #ff8c2a;
     --slider-track: #1a1a28;
@@ -383,14 +385,14 @@
 </head>
 <body>
 
-<div id="canvas-container">
+<main id="canvas-container">
   <canvas id="simCanvas"></canvas>
   <div id="canvas-overlay">
     <div class="day" id="dayLabel">DAY 0</div>
     <div id="fpsLabel">0 fps</div>
   </div>
   <div id="mode-indicator">MODE: INFECT AGENT</div>
-</div>
+</main>
 
 <div id="panel">
   <div class="panel-header">
@@ -437,11 +439,11 @@
     <div class="section-title">Population</div>
     <div class="slider-group">
       <div class="slider-label"><span>Agents <span class="tip">?<span class="tip-text">Total number of agents in the simulation. Change takes effect on Reset.</span></span></span><span class="val" id="valAgents">500</span></div>
-      <input type="range" id="slAgents" min="50" max="2000" value="500" step="10">
+      <input type="range" id="slAgents" min="50" max="2000" value="500" step="10" aria-label="Agents">
     </div>
     <div class="slider-group">
       <div class="slider-label"><span>Agent Speed <span class="tip">?<span class="tip-text">Base movement speed of all agents. Higher values mean faster spread but also faster escape from danger zones.</span></span></span><span class="val" id="valSpeed">1.5</span></div>
-      <input type="range" id="slSpeed" min="0.2" max="4" value="1.5" step="0.1">
+      <input type="range" id="slSpeed" min="0.2" max="4" value="1.5" step="0.1" aria-label="Agent Speed">
     </div>
   </div>
 
@@ -449,19 +451,19 @@
     <div class="section-title">Disease</div>
     <div class="slider-group">
       <div class="slider-label"><span>R₀ <span class="tip">?<span class="tip-text">Basic reproduction number — how many agents one infected agent will infect on average. Higher = more contagious. COVID ≈ 2–3, Measles ≈ 12–18.</span></span></span><span class="val" id="valR0">2.5</span></div>
-      <input type="range" id="slR0" min="0.5" max="8" value="2.5" step="0.1">
+      <input type="range" id="slR0" min="0.5" max="8" value="2.5" step="0.1" aria-label="Basic reproduction number">
     </div>
     <div class="slider-group">
       <div class="slider-label"><span>Mortality % <span class="tip">?<span class="tip-text">Chance an infected agent dies instead of recovering when their infection timer runs out.</span></span></span><span class="val" id="valMortality">3</span></div>
-      <input type="range" id="slMortality" min="0" max="50" value="3" step="1">
+      <input type="range" id="slMortality" min="0" max="50" value="3" step="1" aria-label="Mortality percentage">
     </div>
     <div class="slider-group">
       <div class="slider-label"><span>Infection Duration <span class="tip">?<span class="tip-text">How many ticks an agent stays infected before recovering or dying. Longer duration = more time to spread the disease.</span></span></span><span class="val" id="valDuration">300</span></div>
-      <input type="range" id="slDuration" min="60" max="800" value="300" step="10">
+      <input type="range" id="slDuration" min="60" max="800" value="300" step="10" aria-label="Infection Duration">
     </div>
     <div class="slider-group">
       <div class="slider-label"><span>Infection Radius <span class="tip">?<span class="tip-text">Distance (in pixels) at which an infected agent can transmit the disease to nearby susceptible agents.</span></span></span><span class="val" id="valRadius">30</span></div>
-      <input type="range" id="slRadius" min="10" max="80" value="30" step="1">
+      <input type="range" id="slRadius" min="10" max="80" value="30" step="1" aria-label="Infection Radius">
     </div>
   </div>
 
@@ -469,11 +471,11 @@
     <div class="section-title">Vaccination</div>
     <div class="slider-group">
       <div class="slider-label"><span>Zone Radius <span class="tip">?<span class="tip-text">Size of vaccination zones placed on the canvas. Susceptible agents passing through are gradually vaccinated.</span></span></span><span class="val" id="valVaccRadius">60</span></div>
-      <input type="range" id="slVaccRadius" min="20" max="150" value="60" step="5">
+      <input type="range" id="slVaccRadius" min="20" max="150" value="60" step="5" aria-label="Vaccination Zone Radius">
     </div>
     <div class="slider-group">
       <div class="slider-label"><span>Effectiveness % <span class="tip">?<span class="tip-text">How effective the vaccine is. Higher values mean agents get immunized faster when inside a vaccination zone.</span></span></span><span class="val" id="valVaccEff">90</span></div>
-      <input type="range" id="slVaccEff" min="10" max="100" value="90" step="5">
+      <input type="range" id="slVaccEff" min="10" max="100" value="90" step="5" aria-label="Vaccination Effectiveness">
     </div>
   </div>
 
@@ -481,11 +483,11 @@
     <div class="section-title">Lockdown</div>
     <div class="slider-group">
       <div class="slider-label"><span>Zone Radius <span class="tip">?<span class="tip-text">Size of lockdown zones placed on the canvas. Agents inside move much slower, reducing contact.</span></span></span><span class="val" id="valLockRadius">80</span></div>
-      <input type="range" id="slLockRadius" min="30" max="200" value="80" step="5">
+      <input type="range" id="slLockRadius" min="30" max="200" value="80" step="5" aria-label="Lockdown Zone Radius">
     </div>
     <div class="slider-group">
       <div class="slider-label"><span>Speed Reduction % <span class="tip">?<span class="tip-text">How much agent speed is reduced inside lockdown zones (or globally during lockdown). 90% means agents move at 10% of normal speed.</span></span></span><span class="val" id="valLockReduction">90</span></div>
-      <input type="range" id="slLockReduction" min="50" max="99" value="90" step="1">
+      <input type="range" id="slLockReduction" min="50" max="99" value="90" step="1" aria-label="Speed Reduction">
     </div>
   </div>
 
@@ -543,7 +545,7 @@
 
   // ── State ──
   const S = 0, I = 1, R = 2, D = 3;
-  const STATE_COLORS = ['#3a8bff', '#ff3a3a', '#2ae68c', '#555568'];
+  const STATE_COLORS = ['#3a8bff', '#ff3a3a', '#2ae68c', '#7a7a90'];
 
   let agents = [];
   let vaccZones = [];
@@ -1000,7 +1002,7 @@
       { key: 's', color: '#3a8bff' },
       { key: 'i', color: '#ff3a3a' },
       { key: 'r', color: '#2ae68c' },
-      { key: 'd', color: '#555568' },
+      { key: 'd', color: '#7a7a90' },
     ];
 
     // Stacked area (draw in reverse order for layering)
